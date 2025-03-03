@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tron Light Bike Game</title>
+    <style>
+        canvas {
+            background: black;
+            display: block;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+    <h2>Score: Player A - <span id="score1">0</span> | Player B - <span id="score2">0</span></h2>
+    <canvas id="gameCanvas"></canvas>
+    <audio id="explosionSound" src="explosion.mp3"></audio>
+    <audio id="bikeSound" src="bike_loop.mp3" loop></audio>
+    <audio id="turnSound" src="turn.mp3"></audio>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = (600 + 6 * 5) * 1.5;
+        canvas.height = (400 + 6 * 5) * 1.5;
+
+        const bikeSize = 5;
+        const directions = { UP: 0, RIGHT: 1, DOWN: 2, LEFT: 3 };
+        let score1 = 0, score2 = 0;
+        const explosionSound = document.getElementById("explosionSound");
+        const bikeSound = document.getElementById("bikeSound");
+        const turnSound = document.getElementById("turnSound");
+        bikeSound.play();
+
+        class Bike {
+            constructor(x, y, color, leftKey, rightKey) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.direction = directions.RIGHT;
+                this.trail = [];
+                this.alive = true;
+                this.controls = { left: leftKey, right: rightKey };
+            }
+
+            move() {
+                if (!this.alive) return;
+                this.trail.push({ x: this.x, y: this.y });
+                switch (this.direction) {
+                    case directions.UP: this.y -= bikeSize; break;
+                    case directions.RIGHT: this.x += bikeSize; break;
+                    case directions.DOWN: this.y += bikeSize; break;
+                    case directions.LEFT: this.x -= bikeSize; break;
+                }
+            }
+
+            checkCollision(otherTrail) {
+                if (
+                    this.x < 0 || this.x >= canvas.width ||
+                    this.y < 0 || this.y >= canvas.height ||
+                    this.trail.some(p => p.x === this.x && p.y === this.y) ||
+                    otherTrail.some(p => p.x === this.x && p.y === this.y)
+                ) {
+                    this.alive = false;
+                    createExplosion(this.x, this.y, this.color);
+                    explosionSound.play();
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                this.trail.forEach(p => ctx.fillRect(p.x, p.y, bikeSize, bikeSize));
+                ctx.fillRect(this.x, this.y, bikeSize, bikeSize);
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 10; i++) {
+                setTimeout(() => {
+                    ctx.fillStyle = `rgba(${color === "blue" ? "0, 0, 255" : "255, 0, 0"}, ${(10 - i) / 10})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, i * 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }, i * 50);
+            }
+        }
+
+        function resetGame(winner) {
+            if (winner === 1) score1++;
+            if (winner === 2) score2++;
+            document.getElementById("score1").textContent = score1;
+            document.getElementById("score2").textContent = score2;
+            setTimeout(() => {
+                player1.x = 50; player1.y = canvas.height / 2; player1.direction = directions.RIGHT; player1.trail = []; player1.alive = true;
+                player2.x = canvas.width - 50; player2.y = canvas.height / 2; player2.direction = directions.LEFT; player2.trail = []; player2.alive = true;
+                gameLoop();
+            }, 1000);
+        }
+
+        const player1 = new Bike(50, canvas.height / 2, "blue", "a", "s");
+        const player2 = new Bike(canvas.width - 50, canvas.height / 2, "red", "k", "l");
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === player1.controls.left || e.key === player1.controls.right) {
+                player1.direction = (e.key === player1.controls.left) ? (player1.direction + 3) % 4 : (player1.direction + 1) % 4;
+                turnSound.play();
+            }
+            if (e.key === player2.controls.left || e.key === player2.controls.right) {
+                player2.direction = (e.key === player2.controls.left) ? (player2.direction + 3) % 4 : (player2.direction + 1) % 4;
+                turnSound.play();
+            }
+        });
+
+        function gameLoop() {
+            if (!player1.alive || !player2.alive) {
+                resetGame(player1.alive ? 1 : 2);
+                return;
+            }
+            player1.move();
+            player2.move();
+            player1.checkCollision(player2.trail);
+            player2.checkCollision(player1.trail);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            player1.draw();
+            player2.draw();
+            setTimeout(gameLoop, 50);
+        }
+        gameLoop();
+    </script>
+</body>
+</html>
